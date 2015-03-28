@@ -1,0 +1,466 @@
+﻿<csr:rule name="custom.rg.ApDateTimeRule" match="custom:rg:apdatetime">
+	
+	<csr:class super="dt.common.page.Rule" />
+	
+	<csr:description>
+		
+		<h1>custom:rg:apdatetime</h1>
+		
+		<ul>
+			<li><b>Author:</b> Micky Hulse</li>
+			<li><b>Created:</b> 2011/03/12</li>
+			<li><b>Modified:</b> 2011/03/12</li>
+			<li><b>About:</b> Converts an $horolog/ODBC timestamp into an Associated Press style formatted date and time.</li>
+			<li><b>More:</b> <a href="http://github.com/mhulse/custom.rg.ApDateTimeRule">here</a>...</li>
+		</ul>
+		
+	</csr:description>
+	
+	<csr:attribute name="timestamp" description="Required. $horolog or ODBC timestamp format." type="timestamp:STRING" required />
+	<csr:attribute name="return" description="What bits of the date do you want returned? Valid choices are 'timeonly', 'dateonly', 'time', 'meridiem', 'day', 'month' and 'year'. Default is the full date and time." type="return:STRING" />
+	<csr:attribute name="year" description="Set to 'yes' if you want the current year returned. Default is to not return the current year." type="year:STRING" />
+	<csr:attribute name="today" description="Set to the text you want to return if the day is today. Default is the day number." type="today:STRING" />
+	<csr:attribute name="noon" description="Set to the the text you want to return if the time is noon. Default is 12." type="noon:STRING" />
+	<csr:attribute name="midnight" description="Set to the text you want to return if the time is midnight. Default is 12." type="midnight:STRING" />
+	<csr:attribute name="var" description="Advanced: Name of local variable to use when using as a wrapping tag. Variable name MUST BE UNIQUE!" type="midnight:STRING" />	
+	
+	<csr:action>
+		
+		<script language="cache" runat="compiler">
+			do ..RenderDTStartTag()
+		</script>
+		
+		<script language="cache" runat="server">
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Variables:
+			// 
+			//--------------------------------------------------------------------------
+			
+			//----------------------------------
+			// Declare:
+			//----------------------------------
+			
+			new apdt
+			
+			//----------------------------------
+			// Initialize:
+			//----------------------------------
+			
+			set apdt("dt")           = ""
+			set apdt("d")            = ""
+			set apdt("t")            = ""
+			set apdt("local")        = ""
+			set apdt("get_return")   = ""
+			set apdt("get_year")     = ""
+			set apdt("get_today")    = ""
+			set apdt("get_noon")     = ""
+			set apdt("get_midnight") = ""
+			set apdt("get_var")      = ""
+			set apdt("meridiem")     = ""
+			set apdt("time")         = ""
+			set apdt("day")          = ""
+			set apdt("month")        = ""
+			set apdt("monthnum")     = ""
+			set apdt("year")         = ""
+			set apdt("timeonly")     = ""
+			set apdt("dateonly")     = ""
+			set apdt("noon")         = 0
+			set apdt("midnight")     = 0
+			set apdt("today")        = 0
+			set apdt("nottoday")     = 1
+			set apdt("monthnow")     = 0
+			set apdt("notmonthnow")  = 1
+			set apdt("yearnow")      = 0
+			set apdt("notyearnow")   = 1
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Define macros:
+			// 
+			//--------------------------------------------------------------------------
+			
+			/**
+			* Get meridiem
+			* 
+			* @param      time in this format: hh:mm[AM/PM] (12-hour clock)
+			* @return     string
+			*/
+			
+			#define meridiem(%t) $zconvert($zstrip(%t, "*E",, "AP"), "L") _ ".m."
+			
+			/**
+			* Get time
+			* Thanks to rms & Ben: http://bit.ly/g4im6r
+			* 
+			* @param      time in this format: hh:mm[AM/PM] (12-hour clock)
+			* @return     string
+			*/
+			
+			#define time(%t) +%t _ ":" _ $extract($piece(%t, ":", 2), 1, 2)
+			
+			/**
+			* Get day
+			* 
+			* @param      date in this format: YYYY-[M]M-[D]D
+			* @return     string
+			*/
+			
+			#define day(%d) +$piece(%d, "-", 3)
+			
+			/**
+			* Get month
+			* 
+			* @param      date in this format: YYYY-[M]M-[D]D
+			* @return     string
+			*/
+			
+			#define month(%d) $case(+$piece(%d, "-", 2), 1:"Jan.", 2:"Feb.", 3:"March", 4:"April", 5:"May", 6:"June", 7:"July", 8:"Aug.", 9:"Sept.", 10:"Oct.", 11:"Nov.", 12:"Dec")
+			
+			/**
+			* Get month number
+			* 
+			* @param      date in this format: YYYY-[M]M-[D]D
+			* @return     string
+			*/
+			
+			#define monthnum(%d) +$piece(%d, "-", 2)
+			
+			/**
+			* Get year
+			* 
+			* @param      date in this format: YYYY-[M]M-[D]D
+			* @return     string
+			*/
+			
+			#define year(%d) $piece(%d, "-")
+			
+			/**
+			* Validate ODBC timestamp
+			* Thanks to htg, Leane and Tony: http://bit.ly/fj8ZI1
+			* 
+			* @param      date/time in odbc format: YYYY-MM-DD hh:mm:ss.fff
+			* @return     boolean
+			*/
+			
+			#define isodbc(%odbc) %odbc ?4N2(1"-"2N)1" "2N2(1":"2N).1(1"."1.6N)
+			
+			/**
+			* Validate horolog timestamp
+			* Thanks to htg, Leane and Tony: http://bit.ly/fj8ZI1
+			* 
+			* @param      $horolog timestamp
+			* @return     boolean
+			*/
+			
+			#define ishorolog(%horolog) %horolog ?1.7N1",".5N.1(1"."1.6N)
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Attributes:
+			// 
+			//--------------------------------------------------------------------------
+			
+			//----------------------------------
+			// Required:
+			//----------------------------------
+			
+			set apdt("timestamp") = ##'..GetAttribute("timestamp", "")'##
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Validate timestamp:
+			// 
+			//--------------------------------------------------------------------------
+			
+			if ($$$ishorolog(apdt("timestamp"))) {
+				
+				// ----------------------------------
+				// Convert $horolog format:
+				// ----------------------------------
+				
+				set apdt("dt") = $zdatetime(apdt("timestamp"), 3, 4,,,,,,,, 0)
+				
+			} elseif ($$$isodbc(apdt("timestamp"))) {
+				
+				// ----------------------------------
+				// Convert ODBC format:
+				// ----------------------------------
+				
+				set apdt("dt") = $zdatetime($zdatetimeh(apdt("timestamp"), 3,,,,,,,, -1), 3, 4,,,,,,,, 0)
+				
+			} // Add other date/time formats?
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Continue processing if we have a valid date/time string:
+			// 
+			//--------------------------------------------------------------------------
+			
+			if (apdt("dt")) {
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Attributes:
+				// 
+				//--------------------------------------------------------------------------
+				
+				//----------------------------------
+				// Optional:
+				//----------------------------------
+				
+				set apdt("get_year")     = ##'..GetAttribute("year",     "")'##
+				set apdt("get_today")    = ##'..GetAttribute("today",    "")'##
+				set apdt("get_noon")     = ##'..GetAttribute("noon",     "")'##
+				set apdt("get_midnight") = ##'..GetAttribute("midnight", "")'##
+				set apdt("get_var")      = ##'..GetAttribute("var",      "")'##
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Separate date from time:
+				// 
+				//--------------------------------------------------------------------------
+				
+				set apdt("d") = $piece(apdt("dt"), " ")
+				
+				set apdt("t") = $piece(apdt("dt"), " ", 2)
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Date/time bits:
+				// 
+				//--------------------------------------------------------------------------
+				
+				set apdt("meridiem") = $$$meridiem(apdt("t")) ; [a.m./p.m.]
+				set apdt("time")     = $$$time(apdt("t"))     ; [h]h:mm
+				set apdt("day")      = $$$day(apdt("d"))      ; [d]d
+				set apdt("month")    = $$$month(apdt("d"))    ; [m]m
+				set apdt("monthnum") = $$$monthnum(apdt("d")) ; 1-12
+				set apdt("year")     = $$$year(apdt("d"))     ; yyyy
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Booleans:
+				// 
+				//--------------------------------------------------------------------------
+				
+				// ----------------------------------
+				// Noon or midnight?
+				// ----------------------------------
+				
+				if (apdt("time") = "12:00") {
+					
+					if (apdt("meridiem") = "a.m.") { set apdt("midnight") = 1 } else { set apdt("noon") = 1 }
+					
+				}
+				
+				// ----------------------------------
+				// Today?
+				// ----------------------------------
+				
+				if ($zdate($horolog, 3) = apdt("d")) {
+					
+					set apdt("today") = 1
+					set apdt("nottoday") = 0
+					
+				}
+				
+				// ----------------------------------
+				// This month?
+				// ----------------------------------
+				
+				if ($piece($zdate($horolog), "/", 2) = apdt("month")) {
+					
+					set apdt("monthnow") = 1
+					set apdt("notmonthnow") = 0
+					
+				}
+				
+				// ----------------------------------
+				// This year?
+				// ----------------------------------
+				
+				if ($piece($zdate($horolog), "/", 3) = apdt("year")) {
+					
+					set apdt("yearnow") = 1
+					set apdt("notyearnow") = 0
+					
+				}
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Date/time only:
+				// 
+				//--------------------------------------------------------------------------
+				
+				// ----------------------------------
+				// Date only:
+				// ----------------------------------
+				
+				if (apdt("today") && $length(apdt("get_today"))) {
+					
+					set apdt("dateonly") = apdt("get_today")
+					
+				} else {
+					
+					set apdt("dateonly") = apdt("month") _ " " _ apdt("day")
+					
+					if (apdt("notyearnow") || ($zconvert(apdt("get_year"), "L") = "yes")) {
+						
+						set apdt("dateonly") = apdt("dateonly") _ ", " _ apdt("year")
+						
+					}
+					
+				}
+				
+				// ----------------------------------
+				// Time only:
+				// ----------------------------------
+				
+				if (apdt("noon") && $length(apdt("get_noon"))) {
+					
+					set apdt("timeonly") = apdt("get_noon")
+					
+				} elseif (apdt("midnight") && $length(apdt("get_midnight"))) {
+					
+					set apdt("timeonly") = apdt("get_midnight")
+					
+				} else {
+					
+					set apdt("timeonly") = apdt("time") _ " " _ apdt("meridiem")
+					
+				}
+				
+				//--------------------------------------------------------------------------
+				// 
+				// Setup local variables or write the output:
+				// 
+				//--------------------------------------------------------------------------
+				
+				if ($length(apdt("get_var"))) {
+					
+					//--------------------------------------------------------------------------
+					// 
+					// Variables:
+					// 
+					//--------------------------------------------------------------------------
+					
+					//----------------------------------
+					// Re-initialize:
+					//----------------------------------
+					
+					set apdt("local") = ##class(%ArrayOfDataTypes).%New()
+					
+					//----------------------------------
+					// Populate return array object:
+					//----------------------------------
+					
+					do apdt("local").SetAt(apdt("meridiem"),    "meridiem")
+					do apdt("local").SetAt(apdt("time"),        "time")
+					do apdt("local").SetAt(apdt("day"),         "day")
+					do apdt("local").SetAt(apdt("month"),       "month")
+					do apdt("local").SetAt(apdt("monthnum"),    "monthnum")
+					do apdt("local").SetAt(apdt("year"),        "year")
+					do apdt("local").SetAt(apdt("timeonly"),    "timeonly")
+					do apdt("local").SetAt(apdt("dateonly"),    "dateonly")
+					do apdt("local").SetAt(apdt("noon"),        "noon")
+					do apdt("local").SetAt(apdt("midnight"),    "midnight")
+					do apdt("local").SetAt(apdt("today"),       "today")
+					do apdt("local").SetAt(apdt("nottoday"),    "nottoday")
+					do apdt("local").SetAt(apdt("monthnow"),    "monthnow")
+					do apdt("local").SetAt(apdt("notmonthnow"), "notmonthnow")
+					do apdt("local").SetAt(apdt("yearnow"),     "yearnow")
+					do apdt("local").SetAt(apdt("notyearnow"),  "notyearnow")
+					
+					//--------------------------------------------------------------------------
+					// 
+					// Assign output to <csr:children> "local" variable:
+					// 
+					//--------------------------------------------------------------------------
+					
+					set @apdt("get_var") = apdt("local") ; MUST be unique!
+					
+				} else {
+					
+					//--------------------------------------------------------------------------
+					// 
+					// Attributes:
+					// 
+					//--------------------------------------------------------------------------
+					
+					//----------------------------------
+					// Optional:
+					//----------------------------------
+					
+					set apdt("get_return") = $zconvert(##'..GetAttribute("return",   "")'##, "L")
+					
+					//--------------------------------------------------------------------------
+					// 
+					// Self-closing tag, so write the return:
+					// 
+					//--------------------------------------------------------------------------
+					
+					if ($case(apdt("get_return"), "meridiem":1, "time":1, "day":1, "month":1, "monthnum":1, "year":1, "timeonly":1, "dateonly":1, :0)) {
+						
+						write apdt(apdt("get_return"))
+						
+					} else {
+						
+						write apdt("timeonly") _ ", " _ apdt("dateonly")
+						
+					}
+					
+				}
+				
+			}
+			
+			//--------------------------------------------------------------------------
+			//
+			// Garbage collection:
+			//
+			//--------------------------------------------------------------------------
+			
+			//----------------------------------
+			// Macros:
+			//----------------------------------
+			
+			#undef meridiem, time, day, month, monthnum, year, isodbc, ishorolog
+			
+			//----------------------------------
+			//  Local variables:
+			//----------------------------------
+			
+			kill apdt
+			
+		</script>
+		
+		<csr:children>
+		
+		<script language="cache" runat="server">
+			
+			//--------------------------------------------------------------------------
+			// 
+			// Remove "local" variable (if it exists):
+			// 
+			//--------------------------------------------------------------------------
+			
+			if ($length(##'..GetAttribute("var", "")'##)) {
+			
+				//----------------------------------
+				//  Garbage collection:
+				//----------------------------------
+				
+				kill @##'..GetAttribute("var")'##
+				
+			}
+			
+		</script>
+		
+		<script language="cache" runat="compiler">
+			do ..RenderDTEndTag()
+		</script>
+		
+	</csr:action>
+	
+</csr:rule>

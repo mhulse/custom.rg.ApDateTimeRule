@@ -1,0 +1,63 @@
+﻿<csp:comment>
+#[ set ts = "2010-09-15 09:52:29" ]#
+#[ set ts = "2010-09-15 12:00:00" ]#
+#[ set ts = $zdatetime($horolog, 3) ]#
+#[ set ts = $horolog ]#
+#[ set ts = "2010-09-15 00:00:00" ]#
+</csp:comment>
+#[ set ts = "2010-09-15 09:52:29" ]#
+
+Wrapping: 
+<custom:rg:apdatetime timestamp="#(ts)#" var="ap">
+	<b><csp:if condition=(ap.GetAt("noon"))>Noon<csp:elseif condition=(ap.GetAt("midnight"))>Midnight<csp:else>#(ap.GetAt("time"))# #(ap.GetAt("meridiem"))#</csp:if>, <csp:if condition=(ap.GetAt("today"))>Today<csp:else>#(ap.GetAt("month"))# #(ap.GetAt("day"))#<csp:if condition=(ap.GetAt("notyearnow"))>, #(ap.GetAt("year"))#</csp:if></csp:if></b>
+</custom:rg:apdatetime>
+
+<br>
+
+Basic usage: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" /></b>
+
+<br>
+
+Single, full meal deal: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" year="yes" today="Today" noon="Noon" midnight="Midnight" /></b>
+
+<br>
+
+Single, time only: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="timeonly" /></b>
+
+<br>
+
+Single, date only: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="dateonly" /></b>
+
+<br>
+
+Single, time: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="time" /></b>
+
+<br>
+
+Single, meridiem: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="meridiem" /></b>
+
+<br>
+
+Single, day: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="day" /></b>
+
+<br>
+
+Single, month: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="month" /></b>
+
+<br>
+
+Single, month number: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="monthnum" /></b>
+
+<br>
+
+Single, year: 
+<b><custom:rg:apdatetime timestamp="#(ts)#" return="year" /></b>
